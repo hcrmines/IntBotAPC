@@ -16,6 +16,7 @@
 #include <geometric_shapes/mesh_operations.h>
 
 #include "amazon/AddScoop.h"
+#include "std_msgs/Bool.h"
 
 #include <string>
 
@@ -23,14 +24,17 @@ class AddObjects{
 	public:
 		AddObjects();
 		void handleScoop(amazon::AddScoop);
+		void handleShelf(std_msgs::Bool);
 	protected:
 		ros::NodeHandle nh;
 		moveit::planning_interface::MoveGroup arm;
 		moveit_msgs::PlanningScene planning_scene;
 		ros::Publisher planning_scene_diff_publisher;
 		ros::Subscriber scoopSubscriber;
+		ros::Subscriber shelfSubscriber;
 	private:
 		void addShelf();
+		void removeShelf();
 		void addScoop(std::string);
 		void removeScoop();
 };
@@ -45,10 +49,17 @@ AddObjects::AddObjects() : arm("both_arms") {
 	  sleep_t.sleep();
 	}
 	scoopSubscriber = nh.subscribe("add_scoop", 1, &AddObjects::handleScoop, this);
+	shelfSubscriber = nh.subscribe("add_shelf", 1, &AddObjects::handleShelf, this);
 
 	addShelf();
 }
 
+void AddObjects::handleShelf(std_msgs::Bool message){
+	if(message.data)
+		addShelf();
+	else
+		removeShelf();
+}
 
 void AddObjects::handleScoop(amazon::AddScoop message){
 	if(message.add.data)
@@ -133,6 +144,13 @@ void AddObjects::addScoop(std::string side){
         planning_scene.robot_state.attached_collision_objects.push_back(scoop_object);
         planning_scene.is_diff = true;
         planning_scene_diff_publisher.publish(planning_scene);
+}
+
+void AddObjects::removeShelf(){
+	moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+	std::vector<std::string> object_ids;
+	object_ids.push_back("shelf");
+	planning_scene_interface.removeCollisionObjects(object_ids);
 }
 
 void AddObjects::removeScoop(){

@@ -6,6 +6,7 @@
 #include <amazon/MoveToAction.h>
 #include <actionlib/server/simple_action_server.h>
 #include "geometry_msgs/Point.h"
+#include "baxter_core_msgs/EndEffectorCommand.h"
 
 #include <map>
 
@@ -23,20 +24,22 @@ class Actuator{
 		void executeMotion(const amazon::MoveToGoalConstPtr& goal);
 	protected:
 		ros::NodeHandle nh;
+		ros::Publisher rightGripper;
+		ros::Publisher leftGripper;
 		actionlib::SimpleActionServer<amazon::MoveToAction> moveToServer;
 		moveit::planning_interface::MoveGroup rightArm;
 		std::map<char, geometry_msgs::Point> shelf_positions;
 
 		void calcShelfPositions();
 	private:
+		void closeGripper(char armName);
+		void openGripper(char armName);
 		bool isInsideShelf(geometry_msgs::Point, char);
 		bool moveToPose(geometry_msgs::Pose, char arm);
 };
 
 Actuator::Actuator() : rightArm("both_arms"), moveToServer(nh, "MoveTo", boost::bind(&Actuator::executeMotion, this, _1), false) {
 
-	// Print the name of the reference frame for this robot
-	ROS_INFO("Reference frame: %s", rightArm.getEndEffectorLink().c_str());
 
 	rightArm.setPlannerId("RRTkConfigDefault");
 	rightArm.setPlanningTime(15);
@@ -44,6 +47,9 @@ Actuator::Actuator() : rightArm("both_arms"), moveToServer(nh, "MoveTo", boost::
 	moveToServer.start();
 	
 	calcShelfPositions();
+
+	rightGripper = nh.advertise<baxter_core_msgs::EndEffectorCommand>("/robot/end_effector/right_gripper/command", 1);
+	leftGripper = nh.advertise<baxter_core_msgs::EndEffectorCommand>("/robot/end_effector/left_gripper/command", 1);
 }
 
 void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
@@ -78,6 +84,7 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 			}
 			else
 				moveToServer.setAborted();
+			closeGripper(goal->arm);
 		}
 	}
 	else if (goal->moveAction == amazon::MoveToGoal::MOVE_TO_SHELF){
@@ -224,6 +231,28 @@ bool Actuator::isInsideShelf(geometry_msgs::Point location, char shelf){
 		 location.y > (shelfLeft - 2*HALF_SHELF_WIDTH - TOLERANCE) &&
 		 location.z < (shelfTop + TOLERANCE) && location.z > (shelfBottom - TOLERANCE) &&
 		 location.x > (shelfFront - TOLERANCE) && location.x < (shelfX + TOLERANCE);
+}
+
+void Actuator::closeGripper(char armName){
+	baxter_core_msgs::EndEffectorCommand cmd;
+	cmd.id = 65538;
+	cmd.command = baxter_core_msgs::EndEffectorCommand::CMD_GRIP;
+	if(armName == amazon::MoveToGoal::RIGHT_ARM){
+		rightGripper.publish(cmd);
+	}
+	else
+		leftGripper.publish(cmd);
+}
+
+void Actuator::openGripper(char armName){
+	baxter_core_msgs::EndEffectorCommand cmd;
+	cmd.id = 65538;
+	cmd.command = baxter_core_msgs::EndEffectorCommand::CMD_RELEASE;
+	if(armName == amazon::MoveToGoal::RIGHT_ARM){
+		rightGripper.publish(cmd);
+	}
+	else
+		leftGripper.publish(cmd);
 }
 
 int main(int argc, char **argv){

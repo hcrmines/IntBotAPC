@@ -32,6 +32,9 @@ class Actuator{
 
 		void calcShelfPositions();
 	private:
+		
+		bool pushGrip(char armName, char shelfName, geometry_msgs::Point);
+		bool regularGrip(char armName, geometry_msgs::Point);
 		void closeGripper(char armName);
 		void openGripper(char armName);
 		bool isInsideShelf(geometry_msgs::Point, char);
@@ -178,6 +181,44 @@ void Actuator::calcShelfPositions(){
 		shelf_positions.insert(std::pair<char, geometry_msgs::Point>(shelfName+i,shelfPos));
 	}
 	
+}
+
+bool Actuator::pushGrip(char armName, char shelfName, geometry_msgs::Point surfacePt){
+	geometry_msgs::Pose gripPose;
+	geometry_msgs::Point shelfPoint;
+	gripPose.position = surfacePt;
+	gripPose.orientation.w = 0.7071;
+	gripPose.orientation.x = 0;
+	gripPose.orientation.y = 0.7071;
+	gripPose.orientation.z = 0;
+	if(moveToPose(gripPose, armName)){
+		closeGripper(armName);
+		shelfPoint = shelf_positions.at(shelfName);
+		gripPose.position.z = shelfPoint.z + 0.1; // needs to change based on shelf location
+		if(moveToPose(gripPose, armName)){
+			closeGripper(armName);
+			return true;
+		}
+		else
+			return false;
+	}
+	else
+		return false;
+}
+
+bool Actuator::regularGrip(char armName, geometry_msgs::Point surfacePt){
+	geometry_msgs::Pose gripPose;
+	gripPose.position = surfacePt;
+	gripPose.orientation.w = 0.7071;
+	gripPose.orientation.x = 0;
+	gripPose.orientation.y = 0.7071;
+	gripPose.orientation.z = 0;
+	if(moveToPose(gripPose, armName)){
+		closeGripper(armName);
+		return true;
+	}
+	else
+		return false;
 }
 
 bool Actuator::moveToPose(geometry_msgs::Pose goalPose, char armName){

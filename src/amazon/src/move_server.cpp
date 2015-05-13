@@ -12,6 +12,8 @@
 
 class Actuator{
 	public:
+		enum Grip { PUSH, REGULAR };
+
 		static const float SHELF_DEPTH = 0.435;
 		static const float BOTTOM_SHELF_OFFSET = 0.8297;
 		static const float SHELF_HEIGHT = 0.22860;
@@ -39,7 +41,20 @@ class Actuator{
 		void openGripper(char armName);
 		bool isInsideShelf(geometry_msgs::Point, char);
 		bool moveToPose(geometry_msgs::Pose, char arm);
+		static std::map<std::string, Grip> init_grasps();
+		
+		static const std::map<std::string, Grip> grasps;
 };
+
+const std::map<std::string,Actuator::Grip> Actuator::grasps =  Actuator::init_grasps();
+
+std::map<std::string,Actuator::Grip> Actuator::init_grasps()
+{
+std::map<std::string,Actuator::Grip> m;
+  m["duckies"] = PUSH;
+  m["Elmer's_Glue"] = REGULAR;
+  return m;
+}
 
 Actuator::Actuator() : rightArm("both_arms"), moveToServer(nh, "MoveTo", boost::bind(&Actuator::executeMotion, this, _1), false) {
 

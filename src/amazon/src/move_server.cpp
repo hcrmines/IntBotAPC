@@ -34,7 +34,7 @@ class Actuator{
 
 		void calcShelfPositions();
 	private:
-		
+
 		bool pushGrip(char armName, char shelfName, geometry_msgs::Point);
 		bool regularGrip(char armName, geometry_msgs::Point);
 		void closeGripper(char armName);
@@ -42,7 +42,7 @@ class Actuator{
 		bool isInsideShelf(geometry_msgs::Point, char);
 		bool moveToPose(geometry_msgs::Pose, char arm);
 		static std::map<std::string, Grip> init_grasps();
-		
+
 		static const std::map<std::string, Grip> grasps;
 };
 
@@ -63,7 +63,7 @@ Actuator::Actuator() : rightArm("both_arms"), moveToServer(nh, "MoveTo", boost::
 	rightArm.setPlanningTime(15);
 
 	moveToServer.start();
-	
+
 	calcShelfPositions();
 
 	rightGripper = nh.advertise<baxter_core_msgs::EndEffectorCommand>("/robot/end_effector/right_gripper/command", 1);
@@ -71,7 +71,7 @@ Actuator::Actuator() : rightArm("both_arms"), moveToServer(nh, "MoveTo", boost::
 }
 
 void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
-	
+
 	if(goal->moveAction == amazon::MoveToGoal::MOVE_TO_POSE){
 		ROS_INFO("Moving arm to specified location");
 		if(moveToPose(goal->movePose, goal->arm))
@@ -85,24 +85,24 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 			ROS_WARN("Incorrect shelf name passed in");
 			moveToServer.setAborted();
 		}
-		else if(!isInsideShelf(goal->movePose.position, goal->shelf.data.at(0))){
+		/*else if(!isInsideShelf(goal->movePose.position, goal->shelf.data.at(0))){
 			ROS_WARN("Point is not inside specified shelf");
 			moveToServer.setAborted();
-		}
+		}*/
 		else{
 			ROS_INFO("Moving arm to front of shelf %s", goal->shelf.data.c_str());
-			
+
 			geometry_msgs::Pose shelfPose;
 			shelfPose.position = shelf_positions.at(goal->shelf.data.at(0));
 			// make orientation horizontal in front of shelf
 			shelfPose.orientation.w = 1.0;
 			// move to point in front of shelf, if successful, move into shelf
-			if(moveToPose(shelfPose, goal->arm) && moveToPose(goal->movePose, goal->arm)){
+			if(moveToPose(shelfPose, goal->arm)){// && moveToPose(goal->movePose, goal->arm)){
 				moveToServer.setSucceeded();
 			}
 			else
 				moveToServer.setAborted();
-			closeGripper(goal->arm);
+      pushGrip(goal->arm, goal->shelf.data.at(0), goal->movePose.position);
 		}
 	}
 	else if (goal->moveAction == amazon::MoveToGoal::MOVE_TO_SHELF){
@@ -113,7 +113,7 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 		}
 		else{
 			ROS_INFO("Moving arm to front of shelf %s", goal->shelf.data.c_str());
-			
+
 			geometry_msgs::Pose shelfPose;
 			shelfPose.position = shelf_positions.at(goal->shelf.data.at(0));
 			// make orientation horizontal in front of shelf
@@ -138,7 +138,7 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 		}
 		else{
 			ROS_INFO("Moving arm to front of shelf %s and then drop location", goal->shelf.data.c_str());
-			
+
 			geometry_msgs::Pose shelfPose;
 			shelfPose.position = shelf_positions.at(goal->shelf.data.at(0));
 			// make orientation horizontal in front of shelf
@@ -159,7 +159,7 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 		}
 		else{
 			ROS_INFO("Moving arm to front of shelf %s", goal->shelf.data.c_str());
-			
+
 			geometry_msgs::Pose shelfPose;
 			shelfPose.position = shelf_positions.at(goal->shelf.data.at(0));
 			shelfPose.position.x -= SCOOP_LENGTH;
@@ -181,7 +181,7 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 void Actuator::calcShelfPositions(){
 	geometry_msgs::Point shelfPos;
 	char shelfName = 'A';
-	
+
 	// Get point in front of each shelf
 	double shelfX;
 	nh.getParam("shelf_distance", shelfX);
@@ -195,16 +195,16 @@ void Actuator::calcShelfPositions(){
 			shelfPos.z = BOTTOM_SHELF_OFFSET + BOTTOM_SHELF_HEIGHT/2.0;
 		shelf_positions.insert(std::pair<char, geometry_msgs::Point>(shelfName+i,shelfPos));
 	}
-	
+
 }
 
 bool Actuator::pushGrip(char armName, char shelfName, geometry_msgs::Point surfacePt){
 	geometry_msgs::Pose gripPose;
 	geometry_msgs::Point shelfPoint;
 	gripPose.position = surfacePt;
-	gripPose.orientation.w = 0.7071;
+	gripPose.orientation.w = 0.64278760968;
 	gripPose.orientation.x = 0;
-	gripPose.orientation.y = 0.7071;
+	gripPose.orientation.y = 0.76604444311;
 	gripPose.orientation.z = 0;
 	if(moveToPose(gripPose, armName)){
 		closeGripper(armName);
@@ -244,7 +244,7 @@ bool Actuator::moveToPose(geometry_msgs::Pose goalPose, char armName){
 	if(armName == amazon::MoveToGoal::RIGHT_ARM){
 		planningArm = "right_arm";
 	}
-	else{
+	else if(armName != amazon::MoveToGoal::LEFT_ARM){
 		ROS_WARN("Unknown arm received. Using left arm");
 	}
 	rightArm.setPoseTarget(goalPose, planningArm.c_str());
@@ -282,7 +282,7 @@ bool Actuator::isInsideShelf(geometry_msgs::Point location, char shelf){
 		shelfBottom = BOTTOM_SHELF_OFFSET;
 		shelfTop = shelfBottom + BOTTOM_SHELF_HEIGHT;
 	}
-	
+
 	return location.y < (shelfLeft + TOLERANCE) &&
 		 location.y > (shelfLeft - 2*HALF_SHELF_WIDTH - TOLERANCE) &&
 		 location.z < (shelfTop + TOLERANCE) && location.z > (shelfBottom - TOLERANCE) &&

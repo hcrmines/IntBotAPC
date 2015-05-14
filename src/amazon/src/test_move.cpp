@@ -24,16 +24,17 @@ void MoveController::pickObject(){
 
 	amazon::MoveToGoal goal;
 	goal.moveAction = amazon::MoveToGoal::MOVE_TO_PICK;
-	goal.movePose.position.x = 1.10;
-	goal.movePose.position.y = 0.35;
-	goal.movePose.position.z = 1.65;
+	goal.movePose.position.x = 0.767;
+	goal.movePose.position.y = 0.23;
+	goal.movePose.position.z = 0.735;
 	goal.movePose.orientation.w = 1.0;
+  goal.arm = amazon::MoveToGoal::LEFT_ARM;
 	std_msgs::String shelf;
 	while(nh.ok()){
 		std::cout << "Enter shelf name (single character): ";
 		std::getline(std::cin, shelf.data);
 		goal.shelf = shelf;
-		
+
 		client.sendGoal(goal);
 		client.waitForResult(ros::Duration(60.0));
 		if(client.getState() != actionlib::SimpleClientGoalState::SUCCEEDED){

@@ -59,7 +59,7 @@ std::map<std::string,Actuator::Grip> m;
 Actuator::Actuator() : rightArm("both_arms"), moveToServer(nh, "MoveTo", boost::bind(&Actuator::executeMotion, this, _1), false) {
 
 
-	rightArm.setPlannerId("RRTkConfigDefault");
+//	rightArm.setPlannerId("PRMkConfigDefault");
 	rightArm.setPlanningTime(15);
 
 	moveToServer.start();
@@ -85,24 +85,24 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 			ROS_WARN("Incorrect shelf name passed in");
 			moveToServer.setAborted();
 		}
-		/*else if(!isInsideShelf(goal->movePose.position, goal->shelf.data.at(0))){
+		else if(!isInsideShelf(goal->movePose.position, goal->shelf.data.at(0))){
 			ROS_WARN("Point is not inside specified shelf");
 			moveToServer.setAborted();
-		}*/
+		}
 		else{
 			ROS_INFO("Moving arm to front of shelf %s", goal->shelf.data.c_str());
 
 			geometry_msgs::Pose shelfPose;
 			shelfPose.position = shelf_positions.at(goal->shelf.data.at(0));
 			// make orientation horizontal in front of shelf
-			shelfPose.orientation.w = 1.0;
+			shelfPose.orientation.w = 0.7071;
+			shelfPose.orientation.y = 0.7071;
 			// move to point in front of shelf, if successful, move into shelf
-			if(moveToPose(shelfPose, goal->arm)){// && moveToPose(goal->movePose, goal->arm)){
+			if(moveToPose(shelfPose, goal->arm) && pushGrip(goal->arm, goal->shelf.data.at(0), goal->movePose.position)){// && moveToPose(goal->movePose, goal->arm)){
 				moveToServer.setSucceeded();
 			}
 			else
 				moveToServer.setAborted();
-      pushGrip(goal->arm, goal->shelf.data.at(0), goal->movePose.position);
 		}
 	}
 	else if (goal->moveAction == amazon::MoveToGoal::MOVE_TO_SHELF){
@@ -117,7 +117,8 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 			geometry_msgs::Pose shelfPose;
 			shelfPose.position = shelf_positions.at(goal->shelf.data.at(0));
 			// make orientation horizontal in front of shelf
-			shelfPose.orientation.w = 1.0;
+			shelfPose.orientation.w = 0.7071;
+			shelfPose.orientation.y = 0.7071;
 			// move to point in front of shelf, if successful, move into shelf
 			if(moveToPose(shelfPose, goal->arm)){
 				moveToServer.setSucceeded();
@@ -142,7 +143,8 @@ void Actuator::executeMotion(const amazon::MoveToGoalConstPtr& goal){
 			geometry_msgs::Pose shelfPose;
 			shelfPose.position = shelf_positions.at(goal->shelf.data.at(0));
 			// make orientation horizontal in front of shelf
-			shelfPose.orientation.w = 1.0;
+			shelfPose.orientation.w = 0.7071;
+			shelfPose.orientation.y = 0.7071;
 			// move to point in front of shelf, if successful, move into shelf
 			if(moveToPose(shelfPose, goal->arm) && moveToPose(goal->movePose, goal->arm)){
 				moveToServer.setSucceeded();
@@ -190,26 +192,28 @@ void Actuator::calcShelfPositions(){
 	for(int i = 0; i < NUM_SHELVES; i++){
 		shelfPos.y = (1-(i % 3))*2*HALF_SHELF_WIDTH;
 		if(i < 9)
-			shelfPos.z = BOTTOM_SHELF_OFFSET + BOTTOM_SHELF_HEIGHT + (ceil((NUM_SHELVES -  i) / 3.0) - 1)*SHELF_HEIGHT - SHELF_HEIGHT/2.0;
+			shelfPos.z = BOTTOM_SHELF_OFFSET + BOTTOM_SHELF_HEIGHT + (ceil((NUM_SHELVES -  i) / 3.0) - 1)*SHELF_HEIGHT - SHELF_HEIGHT/2.0 - 0.91;
 		else
-			shelfPos.z = BOTTOM_SHELF_OFFSET + BOTTOM_SHELF_HEIGHT/2.0;
+			shelfPos.z = BOTTOM_SHELF_OFFSET + BOTTOM_SHELF_HEIGHT/2.0 - 0.91; // Offset for Baxter's coordinate system
 		shelf_positions.insert(std::pair<char, geometry_msgs::Point>(shelfName+i,shelfPos));
 	}
-
 }
 
 bool Actuator::pushGrip(char armName, char shelfName, geometry_msgs::Point surfacePt){
 	geometry_msgs::Pose gripPose;
 	geometry_msgs::Point shelfPoint;
 	gripPose.position = surfacePt;
-	gripPose.orientation.w = 0.64278760968;
+	gripPose.orientation.w = 0.7071;
 	gripPose.orientation.x = 0;
-	gripPose.orientation.y = 0.76604444311;
+	gripPose.orientation.y = 0.7071;
 	gripPose.orientation.z = 0;
 	if(moveToPose(gripPose, armName)){
-		closeGripper(armName);
-		shelfPoint = shelf_positions.at(shelfName);
-		gripPose.position.z = shelfPoint.z + 0.1; // needs to change based on shelf location
+		//shelfPoint = shelf_positions.at(shelfName);
+		//gripPose.position.z = shelfPoint.z + 0.1; // needs to change based on shelf location
+		gripPose.orientation.w = 0.64278760968;
+		gripPose.orientation.x = 0;
+		gripPose.orientation.y = 0.76604444311;
+		gripPose.orientation.z = 0;
 		if(moveToPose(gripPose, armName)){
 			closeGripper(armName);
 			return true;
@@ -240,9 +244,9 @@ bool Actuator::moveToPose(geometry_msgs::Pose goalPose, char armName){
 	bool isPlanningSuccess;
 	moveit::planning_interface::MoveGroup::Plan my_plan;
 	rightArm.setStartState(*rightArm.getCurrentState());
-	std::string planningArm = "left_arm";
+	std::string planningArm = "left_gripper";
 	if(armName == amazon::MoveToGoal::RIGHT_ARM){
-		planningArm = "right_arm";
+		planningArm = "right_gripper";
 	}
 	else if(armName != amazon::MoveToGoal::LEFT_ARM){
 		ROS_WARN("Unknown arm received. Using left arm");
@@ -275,11 +279,11 @@ bool Actuator::isInsideShelf(geometry_msgs::Point location, char shelf){
 
 	shelfLeft = (1-(shelfNum % 3))*2*HALF_SHELF_WIDTH + HALF_SHELF_WIDTH;
 	if(shelfNum < 9){
-		shelfBottom = BOTTOM_SHELF_OFFSET + (ceil((NUM_SHELVES -  shelfNum) / 3.0) - 1)*SHELF_HEIGHT;
+		shelfBottom = BOTTOM_SHELF_OFFSET + (ceil((NUM_SHELVES -  shelfNum) / 3.0) - 1)*SHELF_HEIGHT - 0.91;
 		shelfTop = shelfBottom + SHELF_HEIGHT;
 	}
 	else{
-		shelfBottom = BOTTOM_SHELF_OFFSET;
+		shelfBottom = BOTTOM_SHELF_OFFSET - 0.91;
 		shelfTop = shelfBottom + BOTTOM_SHELF_HEIGHT;
 	}
 

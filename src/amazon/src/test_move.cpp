@@ -24,11 +24,10 @@ void MoveController::pickObject(){
 
 	amazon::MoveToGoal goal;
 	goal.moveAction = amazon::MoveToGoal::MOVE_TO_PICK;
-	goal.movePose.position.x = 0.767;
-	goal.movePose.position.y = 0.23;
-	goal.movePose.position.z = 0.735;
-	goal.movePose.orientation.w = 1.0;
-  goal.arm = amazon::MoveToGoal::LEFT_ARM;
+	goal.movePose.position.x = 0.73;
+	goal.movePose.position.y = 0.3;
+	goal.movePose.position.z = 0.75;
+	goal.arm = amazon::MoveToGoal::LEFT_ARM;
 	std_msgs::String shelf;
 	while(nh.ok()){
 		std::cout << "Enter shelf name (single character): ";
